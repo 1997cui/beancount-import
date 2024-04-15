@@ -414,8 +414,10 @@ class RawBrokerageEntry(RawEntry):
                 fees=self.fees,
                 **shared_attrs,
             )
-        if self.action in (BrokerageAction.SHORT_TERM_CAP_GAIN, BrokerageAction.LONG_TERM_CAP_GAIN, BrokerageAction.FUTURES_SWEEP):
+        if self.action in (BrokerageAction.SHORT_TERM_CAP_GAIN, BrokerageAction.LONG_TERM_CAP_GAIN):
             return FundGainsDistribution(symbol=self.symbol, capital_gains_account=capital_gains_account, **shared_attrs)
+        if self.action in (BrokerageAction.FUTURES_SWEEP,):
+            return FuturesSweep(**shared_attrs)
 
         if self.action in (BrokerageAction.ADR_MGMT_FEE,
                            BrokerageAction.SERVICE_FEE,
@@ -744,6 +746,18 @@ class Transfer(TransactionEntry):
     def get_narration_prefix(self) -> str:
         return "TRANSFER"
 
+@dataclass(frozen=True)
+class FuturesSweep(TransactionEntry):
+    def get_sub_account(self) -> Optional[str]:
+        if self.amount.currency != CASH_CURRENCY:
+            return self.amount.currency
+        return "Cash"
+
+    def get_narration_prefix(self) -> str:
+        return "Futures Sweep"
+    
+    def get_other_account(self) -> str:
+        return "Income:Capital"
 
 @dataclass(frozen=True)
 class StockSplit(TransactionEntry):
