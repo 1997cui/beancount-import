@@ -1,11 +1,11 @@
 import datetime
 import socket
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 from beancount.core.data import (EMPTY_SET, Amount, Directive, Meta, Posting,
-                                 Transaction)
+                                 Transaction, Account, Entries, Open)
 from beancount.core.flags import FLAG_OKAY
 from beancount.core.number import D
 
@@ -66,6 +66,21 @@ class MercuryAPI():
                 offset += 500
         return transactions
     
+def get_account_map(accounts: List[Open]) -> Tuple[Dict[Account, str], Dict[str, Account]]:
+    account_to_id = dict()
+    id_to_account = dict()
+    for entry in accounts.values():
+        meta = entry.meta
+        if meta is None:
+            continue
+        account_id = entry.meta.get('mercury_id')
+        if account_id is None:
+            continue
+        account_to_id[entry.account] = account_id
+        id_to_account[account_id] = entry.account
+    return account_to_id, id_to_account
+
+    
 
 class MercurySource(Source):
     def __init__(self, log_status: Callable[[str], None], api_key: str, account_id: str, assets_account: str, **kwargs) -> None:
@@ -83,7 +98,7 @@ class MercurySource(Source):
 
    
 
-    def create_beancount_transaction(self, txn: Dict[str, Any]) -> Transaction:
+    def create_beancount_transaction(self, txn: Dict[str, Any], mercury_account: Account) -> Transaction:
         amount = D(txn['amount'])
         narration = txn['bankDescription']
         payee = txn['counterpartyNickname'] if txn['counterpartyNickname'] else txn['counterpartyName']
@@ -96,23 +111,44 @@ class MercurySource(Source):
             ])
 
         postings = [
-            Posting(self.assets_account, Amount(amount, 'USD'), None, None, None, meta),
+            Posting(mercury_account, Amount(amount, 'USD'), None, None, None, meta),
             Posting(FIXME_ACCOUNT, Amount(-amount, 'USD'), None, None, None, None)
         ]
 
         return Transaction(None, date.date(), FLAG_OKAY, payee, narration, EMPTY_SET, EMPTY_SET, postings)
 
-    def prepare(self, journal: 'JournalEditor', results: SourceResults) -> None:
-        for account, transactions in self.downloaded_txns.items():
-            if account != self.account_id:
+    def prepare(self, journal: JournalEditor, results: SourceResults) -> None:
+        self.account_to_id, self.id_to_account = get_account_map(journal.accounts)
+        # Dedup: Record all seen posing ids in exising transactions:
+        seen_txn_ids = set()
+        for entry in journal.all_entries:
+            if not isinstance(entry, Transaction):
                 continue
-            print(transactions)
-            beancount_entries = [self.create_beancount_transaction(txn) for txn in transactions]
-
-            for entry in beancount_entries:
+            last_lineno = None
+            for posting in entry.postings:
+                meta = posting.meta
+                if meta is None: continue
+                # Skip duplicated postings due to booking.
+                new_lineno = meta['lineno']
+                if new_lineno is not None and new_lineno == last_lineno:
+                    continue
+                last_lineno = new_lineno
+                txn_id = meta.get('mercury_id', None)
+                if txn_id is None:
+                    continue
+                seen_txn_ids.add(txn_id)
+        print(seen_txn_ids)
+        for account_id, transactions in self.downloaded_txns.items():
+            if account_id not in self.id_to_account:
+                continue
+            account: Account = self.id_to_account[account_id]
+            for txn in transactions:
+                if txn['id'] and txn['id'] in seen_txn_ids:
+                    continue
+                entry = self.create_beancount_transaction(txn, account)
                 results.add_pending_entry(ImportResult(date=entry.date, entries=[entry], info=None))
 
-            results.add_account(self.assets_account)
+            results.add_account(account)
 
     def is_posting_cleared(self, posting: Posting) -> bool:
         if not posting.meta:
