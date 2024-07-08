@@ -18,7 +18,13 @@ from datetime import datetime
 import collections
 import urllib.parse
 
-# Constants
+"""
+Usage:
+In the account you want to import, add meta `mercury_id` for account id
+In the import module, use `api_key` to pass through Mercury API key
+API doc is here: https://docs.mercury.com/reference/welcome-to-mercury-api
+
+"""
 
 def allowed_gai_family(): 
     return socket.AF_INET
@@ -83,12 +89,10 @@ def get_account_map(accounts: List[Open]) -> Tuple[Dict[Account, str], Dict[str,
     
 
 class MercurySource(Source):
-    def __init__(self, log_status: Callable[[str], None], api_key: str, account_id: str, assets_account: str, **kwargs) -> None:
+    def __init__(self, log_status: Callable[[str], None], api_key: str, **kwargs) -> None:
         super().__init__(log_status, **kwargs)
         self.log_status = log_status
         self.api_key = api_key
-        self.account_id = account_id
-        self.assets_account = assets_account
         self.mercury_api = MercuryAPI(api_key)
         self.downloaded_txns = self.mercury_api.fetch_mercury_transactions()
 
