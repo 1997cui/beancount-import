@@ -137,7 +137,6 @@ class MercurySource(Source):
                 if txn_id is None:
                     continue
                 seen_txn_ids.add(txn_id)
-        print(seen_txn_ids)
         for account_id, transactions in self.downloaded_txns.items():
             if account_id not in self.id_to_account:
                 continue
