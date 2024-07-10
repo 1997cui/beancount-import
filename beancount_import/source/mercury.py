@@ -66,6 +66,8 @@ class MercuryAPI():
                 response.raise_for_status()
                 data = response.json()
                 for txn in data['transactions']:
+                    if 'status' not in txn or txn['status'] != 'sent':
+                        continue
                     transactions[account].append(txn)
                 if len(data['transactions']) < 500:
                     break
@@ -106,7 +108,7 @@ class MercurySource(Source):
         amount = D(txn['amount'])
         narration = txn['bankDescription']
         payee = txn['counterpartyNickname'] if txn['counterpartyNickname'] else txn['counterpartyName']
-        date = datetime.fromisoformat(txn['createdAt'].replace("Z", "+00:00"))
+        date = datetime.fromisoformat(txn['postedAt'].replace("Z", "+00:00"))
         meta = collections.OrderedDict([
             ('mercury_id', txn['id']),
             ('date', date.date()),
