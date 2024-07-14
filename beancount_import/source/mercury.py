@@ -1,5 +1,6 @@
 import datetime
 import socket
+import decimal
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
@@ -64,7 +65,7 @@ class MercuryAPI():
             while True:
                 response = requests.get(f"{full_url}{offset}", headers=self._get_headers())
                 response.raise_for_status()
-                data = response.json()
+                data = response.json(parse_float=decimal.Decimal)
                 for txn in data['transactions']:
                     if 'status' not in txn or txn['status'] != 'sent':
                         continue
@@ -164,7 +165,7 @@ class MercurySource(Source):
     def get_example_key_value_pairs(self, transaction: Transaction, posting: Posting) -> Dict[str, str]:
         result = dict()
         result['desc'] = transaction.narration
-        result['payee'] = transaction.payee
+        result['payee'] = transaction.payee if transaction.payee else ''
         if 'kind' in posting.meta:
             result['kind'] = posting.meta['kind']
         if 'counterpartyName' in posting.meta:
