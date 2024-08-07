@@ -194,6 +194,7 @@ class BrokerageAction(enum.Enum):
     STOCK_PLAN_ACTIVITY = "Stock Plan Activity"
     STOCK_SPLIT = "Stock Split"
     WIRE_FUNDS = "Wire Funds"
+    WIRE_FUNDS_SENT = "Wire Sent"
     WIRE_FUNDS_RECEIVED = "Wire Received"
     FUNDS_RECEIVED = "Funds Received"
     ATM_REBATE_RECEIVED = "Schwab ATM Rebate"
@@ -372,6 +373,7 @@ class RawBrokerageEntry(RawEntry):
                            BrokerageAction.JOURNALED_SHARES,
                            BrokerageAction.SECURITY_TRANSFER,
                            BrokerageAction.WIRE_FUNDS,
+                           BrokerageAction.WIRE_FUNDS_SENT,
                            BrokerageAction.WIRE_FUNDS_RECEIVED,
                            BrokerageAction.FUNDS_RECEIVED,
                            BrokerageAction.ATM_REBATE_RECEIVED,
