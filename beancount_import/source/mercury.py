@@ -164,7 +164,7 @@ class MercurySource(Source):
 
     def get_example_key_value_pairs(self, transaction: Transaction, posting: Posting) -> Dict[str, str]:
         result = dict()
-        result['desc'] = transaction.narration
+        result['desc'] = transaction.narration if transaction.narration else ''
         result['payee'] = transaction.payee if transaction.payee else ''
         if 'kind' in posting.meta:
             result['kind'] = posting.meta['kind']
