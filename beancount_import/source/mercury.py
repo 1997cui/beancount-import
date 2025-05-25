@@ -16,6 +16,7 @@ from beancount_import.source import (AssociatedData, ImportResult, Source,
 from ..matching import FIXME_ACCOUNT
 from ..journal_editor import JournalEditor
 from datetime import datetime
+import datetime as dt_base
 import collections
 import urllib.parse
 
@@ -54,16 +55,17 @@ class MercuryAPI():
             self.accounts.append(account['id'])
 
     def fetch_mercury_transactions(self) -> Dict:
-        MERCURY_API_TXN = 'account/{account_id}/transactions?limit=500&offset={offset}'
-        'https://api.mercury.com/api/v1/account/{account_id}/transactions?limit=500&offset={offset}'
+        MERCURY_API_TXN = 'account/{account_id}/transactions?limit=500&offset={offset}&start={start}'
         transactions: Dict[str, List] = {}
+        # Calculate start date 90 days before today in YYYY-MM-DD format
+        start_date = (dt_base.datetime.now(dt_base.timezone.utc) - dt_base.timedelta(days=90)).strftime('%Y-%m-%d')
         for account in self.accounts:
             transactions[account] = []
             offset = 0
-            partial = MERCURY_API_TXN.format(account_id=account, offset=offset)
-            full_url = urllib.parse.urljoin(self.MERCURY_API_BASE, partial)
             while True:
-                response = requests.get(f"{full_url}{offset}", headers=self._get_headers())
+                partial = MERCURY_API_TXN.format(account_id=account, offset=offset, start=start_date)
+                full_url = urllib.parse.urljoin(self.MERCURY_API_BASE, partial)
+                response = requests.get(full_url, headers=self._get_headers())
                 response.raise_for_status()
                 data = response.json(parse_float=decimal.Decimal)
                 for txn in data['transactions']:
