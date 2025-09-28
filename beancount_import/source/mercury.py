@@ -110,7 +110,7 @@ class MercurySource(Source):
     def create_beancount_transaction(self, txn: Dict[str, Any], mercury_account: Account) -> Transaction:
         amount = D(txn['amount'])
         narration = txn['bankDescription']
-        payee = txn['counterpartyNickname'] if txn['counterpartyNickname'] else txn['counterpartyName']
+        payee = txn['counterpartyNickname'] if 'counterpartyNickname' in txn and txn['counterpartyNickname'] else txn['counterpartyName']
         date = datetime.fromisoformat(txn['postedAt'].replace("Z", "+00:00"))
         meta = collections.OrderedDict([
             ('mercury_id', txn['id']),
