@@ -172,7 +172,6 @@ class BrokerageAction(enum.Enum):
     MONEYLINK_DEPOSIT = "MoneyLink Deposit"
     MONEYLINK_TRANSFER = "MoneyLink Transfer"
     ATM_WITHDRAW = "ATM Withdrawal"
-    ATM_WITHDRAW = "ATM Withdrawal"
     PRIOR_YEAR_CASH_DIVIDEND = "Pr Yr Cash Div"
     PRIOR_YEAR_DIV_REINVEST = "Pr Yr Div Reinvest"
     PRIOR_YEAR_SPECIAL_DIVIDEND = "Pr Yr Special Div"
