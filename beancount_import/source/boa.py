@@ -18,6 +18,7 @@ from beancount.core.data import Transaction, Posting, Meta
 from beancount.core import flags
 from beancount.core.amount import Amount
 from beancount.core.number import D
+from ..matching import FIXME_ACCOUNT
 
 from dateutil.parser import parse
 
@@ -38,6 +39,30 @@ class BOASource(Source):
 
     def prepare(self, journal, results: SourceResults) -> None:
         results.add_account(self.account)
+
+        # Gather references already present in the journal so we don't import
+        # duplicates that have been previously recorded.
+        existing_references = set()
+        for entry in getattr(journal, 'all_entries', []):
+            from beancount.core.data import Transaction as _Txn
+            if not isinstance(entry, _Txn):
+                continue
+            # Collect references only for transactions that involve our
+            # configured source account (avoid cross-account collisions).
+            infl_account_present = False
+            for p in entry.postings:
+                if p.account == self.account:
+                    infl_account_present = True
+                    meta = p.meta
+                    if meta is None:
+                        continue
+                    ref = meta.get('reference')
+                    if ref:
+                        existing_references.add(ref)
+            # If the transaction itself has a reference and the source
+            # account is present, include it as well.
+            if infl_account_present and entry.meta is not None and entry.meta.get('reference'):
+                existing_references.add(entry.meta.get('reference'))
 
         seen_references = set()  # dedupe across files processed by this source
 
@@ -89,18 +114,24 @@ class BOASource(Source):
 
                     reference = row.get(ref_key, '').strip() if ref_key else ''
                     if reference:
+                        # Skip if we already processed this reference in the
+                        # current run, or if the reference exists in the
+                        # journal already.
                         if reference in seen_references:
+                            continue
+                        if reference in existing_references:
+                            # Silently skip duplicates already present in
+                            # the journal.
                             continue
                         seen_references.add(reference)
 
                     desc = row.get(desc_key, '').strip() if desc_key else ''
 
-                    meta: Meta = {'filename': csv_filename, 'lineno': idx}
-                    if reference:
-                        meta['reference'] = reference
+                    # Only attach metadata to the BOA leg (the source posting).
+                    posting_meta: Meta = {'date': trans_date, 'reference': reference, 'source_desc': desc, 'filename': csv_filename, 'lineno': idx}
 
                     txn = Transaction(
-                        meta=meta,
+                        meta={},
                         date=trans_date,
                         flag=flags.FLAG_OKAY,
                         payee='',
@@ -109,9 +140,15 @@ class BOASource(Source):
                         links=set(),
                         postings=[],
                     )
+
+                    # BOA posting (source account)
                     txn.postings.append(
-                        Posting(self.account, Amount(number=trans_amt, currency='USD'), None, None, None,
-                                {'date': trans_date, 'reference': reference} )
+                        Posting(self.account, Amount(number=trans_amt, currency='USD'), None, None, None, posting_meta)
+                    )
+
+                    # Add balancing posting to FIXME account (unknown other leg)
+                    txn.postings.append(
+                        Posting(FIXME_ACCOUNT, Amount(number=-trans_amt, currency='USD'), None, None, None, {})
                     )
 
                     results.add_pending_entry(ImportResult(date=txn.date, entries=[txn], info={'filename': csv_filename}))
