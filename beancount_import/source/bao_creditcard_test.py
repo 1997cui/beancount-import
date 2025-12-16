@@ -7,6 +7,7 @@ pytest.importorskip('beancount')
 from ..source import SourceResults
 import beancount_import.source.bao_creditcard as bao
 from beancount_import.journal_editor import JournalEditor
+from beancount.core.number import D
 
 
 def test_bao_creditcard_source_dedup(tmp_path):
@@ -57,6 +58,9 @@ def test_bao_creditcard_source_dedup(tmp_path):
         assert bal_posting.account == 'Expenses:FIXME'
         # amounts should balance
         assert float(boa_posting.units.number) == -float(bal_posting.units.number)
+        # amounts should be quantized to two decimal places
+        assert boa_posting.units.number == boa_posting.units.number.quantize(D('0.01'))
+        assert bal_posting.units.number == bal_posting.units.number.quantize(D('0.01'))
 
     assert refs == {'24801975347580272595791', '24692165347106055830641'}
 
@@ -99,3 +103,5 @@ def test_bao_creditcard_source_skips_existing_journal_reference(tmp_path):
     assert len(results.pending) == 1
     boa_posting = next(p for p in results.pending[0].entries[0].postings if p.account == 'Liabilities:Credit-Card:BOA:0000')
     assert boa_posting.meta['reference'] == 'REF-B'
+    # amount should be quantized to two decimals
+    assert boa_posting.units.number == boa_posting.units.number.quantize(D('0.01'))

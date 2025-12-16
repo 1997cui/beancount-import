@@ -106,6 +106,15 @@ class BaoCreditCardSource(Source):
                     # BOA CSV uses negative amounts for charges and positive for
                     # credits. Use the sign as provided in the CSV (do not invert).
                     trans_amt = amt
+                    # Ensure amounts are quantized to two decimal places so
+                    # postings display consistently like "18.74" rather than
+                    # "18.740000" or "18.7".
+                    try:
+                        trans_amt = trans_amt.quantize(D('0.01'))
+                    except Exception:
+                        # If quantization fails for any unusual decimal, fall
+                        # back to the unquantized value.
+                        pass
 
                     raw_date = row.get(date_key, '').strip()
                     try:
@@ -149,7 +158,7 @@ class BaoCreditCardSource(Source):
 
                     # Add balancing posting to FIXME account (unknown other leg)
                     txn.postings.append(
-                        Posting(FIXME_ACCOUNT, Amount(number=-trans_amt, currency='USD'), None, None, None, {})
+                        Posting(FIXME_ACCOUNT, Amount(number=(-trans_amt).quantize(D('0.01')), currency='USD'), None, None, None, {})
                     )
 
                     results.add_pending_entry(ImportResult(date=txn.date, entries=[txn], info={'filename': csv_filename}))
