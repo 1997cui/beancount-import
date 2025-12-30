@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import csv
 import os
-from typing import Sequence, List
+from typing import Sequence, List, Dict
 
 from beancount_import.source import Source, ImportResult, SourceResults
 from beancount_import.source import SourceSpec
@@ -144,8 +144,8 @@ class BaoCreditCardSource(Source):
                         meta={},
                         date=trans_date,
                         flag=flags.FLAG_OKAY,
-                        payee='',
-                        narration=desc,
+                        payee=desc,
+                        narration='',
                         tags=set(),
                         links=set(),
                         postings=[],
@@ -166,3 +166,22 @@ class BaoCreditCardSource(Source):
     def is_posting_cleared(self, posting):
         # BOA CSVs only indicate transaction date; no extra clearing info here
         return False
+
+    def get_example_key_value_pairs(self, transaction: Transaction, posting: Posting) -> Dict[str, str]:
+        """Extract training features for auto-categorization.
+
+        This enables the training system to match BOA transactions against:
+        - Manually entered transactions with payee fields
+        - Previously categorized BOA transactions
+        - Transactions from other sources with similar descriptions
+        """
+        result = dict()
+        # Extract transaction-level fields
+        result['desc'] = transaction.narration if transaction.narration else ''
+        result['payee'] = transaction.payee if transaction.payee else ''
+        # Extract posting metadata (merchant/payee description from CSV)
+        if posting.meta:
+            source_desc = posting.meta.get('source_desc', '')
+            if source_desc:
+                result['source_desc'] = source_desc
+        return result
